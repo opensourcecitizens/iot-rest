@@ -119,7 +119,8 @@ public class GatewayRESTJsonService {
 	@POST
 	@Path("/queue/avro/stream/topic/{topic}/")
 	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
+	//@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
+	@Produces(MediaType.TEXT_PLAIN)
 	public String postParamInputByteStream(@HeaderParam("Authentication")String authentication,@PathParam("topic")String topic,InputStream jsonStream, @QueryParam("userid")String userid) {
 		System.out.println("Recieved json message");
 		//StringBuilder crunchifyBuilder = new StringBuilder();
