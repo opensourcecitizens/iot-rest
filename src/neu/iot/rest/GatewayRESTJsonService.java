@@ -1,5 +1,6 @@
 package neu.iot.rest;
 
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,20 +21,16 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.IOUtils;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
 
 import io.client.kafka.KafkaProducerClient;
-import io.parser.avro.AvroUtils;
 
 /**
- * Is a REST service example Responses 1** = informational 2** = success 3** =
+ * Is a REST service
+ * Responses 1** = informational 2** = success 3** =
  * redirect 4** = client error 5** = server error
  */
 @Path("/")
@@ -45,10 +42,12 @@ public class GatewayRESTJsonService {
 	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
 	public Response get() {
 		String result = "This is a REST api http service for json messages. Supported URIs:"
-				+ "\n '/queue/json?topic={topic}&userid={userid}&message={json_message}' "
-				+ "\n '/queue/json/topic/{topic}?userid={userid}&message={json_message}'"
-				+ "\n '/queue/json/stream/topic/{topic}?userid={userid}&message={json_message}'"
-				+ "\n SECURITY: Required header params : 'Authentication'";
+				+ "\n '/queue/json?topic={topic}&userid={userid}&message={json_message}' -h 'Content-type:application/json'"
+				+ "\n '/queue/json/topic/{topic}?userid={userid}&message={json_message}' -h 'Content-type:application/json'"
+				+ "\n '/queue/json/stream/topic/{topic}?userid={userid}' -h 'Content-type:application/json' -d '{json_message}'"
+				+ "\n '/queue/avro/stream/topic/{topic}?userid={userid}' -h 'Content-type:application/octet-stream' -d '[byte array]'"
+				+ "\n SECURITY: Required header params :  -h 'Authentication: <jwt-token>' ";
+
 		return Response.status(200).entity(result).build();
 	}
 	
@@ -81,7 +80,6 @@ public class GatewayRESTJsonService {
 		return sendToKafka(authentication,message, topic, userid);
 	}
 	
-
 	@POST
 	@Path("/queue/json/stream/topic/{topic}/")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -118,11 +116,10 @@ public class GatewayRESTJsonService {
 	
 	@POST
 	@Path("/queue/avro/stream/topic/{topic}/")
-	@Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-	//@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
-	@Produces(MediaType.TEXT_PLAIN)
+	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
+	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
 	public String postParamInputByteStream(@HeaderParam("Authentication")String authentication,@PathParam("topic")String topic,InputStream jsonStream, @QueryParam("userid")String userid) {
-		System.out.println("Recieved json message");
+		System.out.println("Recieved byte[] message");
 		//StringBuilder crunchifyBuilder = new StringBuilder();
 		String result = "";
 			BufferedReader is = new BufferedReader(new InputStreamReader(jsonStream));
@@ -138,17 +135,17 @@ public class GatewayRESTJsonService {
 				 result = "Unable to POST "
 						+ e.getLocalizedMessage();
 				 log.error(e, e);
+				 e.printStackTrace();
 				try {
 					return new ObjectMapper().writeValueAsString(Response.status(500).entity(result).build());
 				} catch (Throwable e1) {
 					
 					log.error(e,e);
+					e.printStackTrace();
 				}
 			
 			}
-			
-
-			
+				
 			return sendUnwrapped2Kafka(authentication,buf, topic, userid);	
 	}
 	
@@ -157,30 +154,28 @@ public class GatewayRESTJsonService {
 		
 		String result = "Successufully queued message of length="+message.length+" on topic="+topic;
 
-		System.out.println( "Successufully queued message of length="+message.length );
+		
 		ObjectMapper mapper = new ObjectMapper();
 		
 		try{
 			
-			Schema schema = new Schema.Parser().parse(new URL("https://s3-us-west-2.amazonaws.com/iot-dev-avroschema/registry-to-spark/versions/current/remoterequest.avsc").openStream());
-
-			GenericRecord record = AvroUtils.avroToJava(message, schema);
-			System.out.println(record);
-			message = AvroUtils.serializeJava(record, schema);
 			
-			KafkaProducerClient<byte[]> kafka = new KafkaProducerClient<byte[]>();
+			@SuppressWarnings("unchecked")
+			KafkaProducerClient<byte[]> kafka =  (KafkaProducerClient<byte[]>) KafkaProducerClient.singleton();
 			
 			if(topic!=null){
-				result = kafka.send(message,topic);
+				result = result + kafka.send(message,topic);
 			}else{
 				Future<RecordMetadata> res = kafka.send(message);
+				result = result + res.get().toString();
 			}
 			
-		} catch (IOException e) {
+		} catch (Exception e) {
 
 			 result = "Unable to queue message of length =" + message.length + " because of "
 					+ e.getLocalizedMessage();
-			 log.error(e,e);
+			 log.error(result,e);
+			 e.printStackTrace();
 			try {
 				return mapper.writeValueAsString(Response.status(500).entity(result).build());
 			} catch (Throwable e1) {
@@ -191,9 +186,11 @@ public class GatewayRESTJsonService {
 		}
 
 		try {
+			System.out.println( result);
 			return mapper.writeValueAsString(Response.status(200).entity(result).build());
 		} catch (Throwable e) {
 			log.error(e,e);
+			e.printStackTrace();
 		} 
 		return "";
 	}
@@ -201,6 +198,8 @@ public class GatewayRESTJsonService {
 	
 	private <T> String sendToKafka(String authentication, T message,  String topic, String userid) {
 		
+		System.out.println("Sending to kafka ...");
+		String returnString = "";
 		String result = "Successufully queued message ="+message+" on topic="+topic;
 		Map<String, Object> data = new HashMap<String,Object>();
 		data.put("payload", message);
@@ -213,34 +212,41 @@ public class GatewayRESTJsonService {
 		try{
 			
 			String json = mapper.writeValueAsString(data);
-			KafkaProducerClient kafka = KafkaProducerClient.singleton();
+			KafkaProducerClient<byte[]> kafka = (KafkaProducerClient<byte[]>) KafkaProducerClient.singleton();
 			
 			if(topic!=null){
-				result = kafka.send(json,topic);
+				result = kafka.send(json.getBytes(),topic);
 			}else{
-				Future<RecordMetadata> res = kafka.send(json);
+				Future<RecordMetadata> res = kafka.send(json.getBytes());
+				result = res.get().toString();
 			}
 			
-		} catch (IOException e) {
+			
+		} catch (Exception e) {
 
 			 result = "Unable to queue message =" + message + " because of "
 					+ e.getLocalizedMessage();
 			 log.error(e,e);
+			 e.printStackTrace();
 			try {
-				return mapper.writeValueAsString(Response.status(500).entity(result).build());
+				returnString = mapper.writeValueAsString(Response.status(500).entity(result).build());
 			} catch (Throwable e1) {
 				// TODO Auto-generated catch block
 				e1.printStackTrace();
 				log.error(e,e);
 			}
+			return returnString;
 		}
 
 		try {
-			return mapper.writeValueAsString(Response.status(200).entity(result).build());
+			returnString = mapper.writeValueAsString(Response.status(200).entity(result).build());
 		} catch (Throwable e) {
 			log.error(e,e);
+			e.printStackTrace();
 		} 
-		return "";
+		
+		System.out.println(returnString);
+		return returnString;
 	}
 
 }

@@ -59,11 +59,6 @@ public class JettyServerRun /// extends AbstractHandler
         Server server = new Server(Integer.parseInt(properties.getProperty("service.port")));
         server.setHandler(context);
         
-       // URI baseUri = UriBuilder.fromUri("http://localhost").port(Integer.parseInt(properties.getProperty("service.port"))).build();
-       // ResourceConfig config = new ResourceConfig(GatewayRESTService.class);
-        //Server server = JettyHttpContainerFactory.createServer(baseUri, config);
-        
-      
         
         server.start();
         server.join();

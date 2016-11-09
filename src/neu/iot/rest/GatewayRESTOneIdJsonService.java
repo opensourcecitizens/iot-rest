@@ -40,9 +40,6 @@ public class GatewayRESTOneIdJsonService {
 		String result = "This is a REST api http service for json messages. Supported URIs:"
 				+ "\n '/queue/json?message={json_message}' "
 				+ "\n '/queue/json/stream?message={json_message}'"
-				//+ "\n '/queue/json?topic={topic}&userid={userid}&message={json_message}' "
-				//+ "\n '/queue/json/topic/{topic}?userid={userid}&message={json_message}'"
-				//+ "\n '/queue/json/stream/topic/{topic}?userid={userid}&message={json_message}'"
 				+ "\n SECURITY: Required header params : 'Authentication'";
 		return Response.status(200).entity(result).build();
 	}
