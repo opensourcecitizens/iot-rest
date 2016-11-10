@@ -2,10 +2,8 @@ package neu.iot.rest;
 
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Future;
@@ -29,14 +27,19 @@ import org.codehaus.jackson.map.ObjectMapper;
 import io.client.kafka.KafkaProducerClient;
 
 /**
- * Is a REST service
- * Responses 1** = informational 2** = success 3** =
+ * This service consumes messages to be transfered to kafka topic. It is therefore a web interface for kakfa topics or a cloud gateway for the data pipeline. .
+ * Example Responses 1** = informational 2** = success 3** =
  * redirect 4** = client error 5** = server error
+ * 
+ * @author kndungu
  */
 @Path("/")
 public class GatewayRESTJsonService {
 	Logger log = Logger.getLogger(GatewayRESTJsonService.class);
 	
+	/**
+	 * @return
+	 */
 	@GET
 	@Path("/about")
 	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
@@ -51,6 +54,10 @@ public class GatewayRESTJsonService {
 		return Response.status(200).entity(result).build();
 	}
 	
+	/**
+	 * Get function that shows available methods.
+	 * @return Response
+	 */
 	@GET
 	@Path("/queue")
 	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
@@ -59,7 +66,16 @@ public class GatewayRESTJsonService {
 		return Response.status(200).entity(result).build();
 	}
 	
-
+	/**
+	 * POST function that shows available methods.
+	 * '/queue/json?message={json_message}' -h 'Authentication:<jwt token>'
+	 * 
+	 * @param authentication
+	 * @param message
+	 * @param topic
+	 * @param userid
+	 * @return Response
+	 */
 	@POST
 	@Path("/queue/json")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -70,7 +86,17 @@ public class GatewayRESTJsonService {
 	}
 	
 
-	
+	/**
+	 * POST function posts a message appended to url as a query parameter.
+	 * 
+	 * Available as '$CONTEXT/queue/json/topic/{topic}?userid={username}&message={json message}'  -h 'Authentication:<jwt token>'
+	 * 
+	 * @param authentication
+	 * @param message
+	 * @param topic
+	 * @param userid
+	 * @return Response
+	 */
 	@POST
 	@Path("/queue/json/topic/{topic}")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -80,6 +106,17 @@ public class GatewayRESTJsonService {
 		return sendToKafka(authentication,message, topic, userid);
 	}
 	
+	/**
+	 * POST function for posting large json payloads as a stream.
+	 * 
+	 * Available as '$CONTEXT/queue/json/stream/topic/{topicname}?userid={username}'  -d {json message} -h 'Authentication:<jwt token>'
+	 * 
+	 * @param authentication
+	 * @param topic
+	 * @param jsonStream
+	 * @param userid
+	 * @return Response
+	 */
 	@POST
 	@Path("/queue/json/stream/topic/{topic}/")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -113,7 +150,17 @@ public class GatewayRESTJsonService {
 			return sendToKafka(authentication,crunchifyBuilder.toString(), topic, userid);	
 	}
 	
-	
+	/**
+	 * POST function for posting large avro payloads as a stream.
+	 * 
+	 * Available as '$CONTEXT/queue/avro/stream/topic/{topicname}?userid={username}'  -d {json message} -h 'Authentication:<jwt token>'
+	 * 
+	 * @param authentication
+	 * @param topic
+	 * @param jsonStream
+	 * @param userid
+	 * @return Response
+	 */
 	@POST
 	@Path("/queue/avro/stream/topic/{topic}/")
 	@Consumes(MediaType.APPLICATION_OCTET_STREAM)
@@ -150,6 +197,13 @@ public class GatewayRESTJsonService {
 	}
 	
 	
+	/**
+	 * @param authentication
+	 * @param message
+	 * @param topic
+	 * @param userid
+	 * @return String
+	 */
 	private String sendUnwrapped2Kafka(String authentication, byte[] message,  String topic, String userid) {
 		
 		String result = "Successufully queued message of length="+message.length+" on topic="+topic;
@@ -196,6 +250,15 @@ public class GatewayRESTJsonService {
 	}
 	
 	
+	/**
+	 * This method sends a message to kafka. It creates a JSON wrapper message with payload, sourceid,authentication and messagetype attributes.
+	 * 
+	 * @param authentication
+	 * @param message
+	 * @param topic
+	 * @param userid
+	 * @return String
+	 */
 	private <T> String sendToKafka(String authentication, T message,  String topic, String userid) {
 		
 		System.out.println("Sending to kafka ...");

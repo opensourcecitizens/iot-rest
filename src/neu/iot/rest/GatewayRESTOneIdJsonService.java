@@ -26,13 +26,22 @@ import org.codehaus.jackson.map.ObjectMapper;
 import io.client.kafka.KafkaProducerClient;
 
 /**
- * Is a REST service example Responses 1** = informational 2** = success 3** =
+ * This service consumes messages to be transfered to a kafka topic. 
+ * It is therefore a web interface for kakfa topics or a cloud gateway for the data pipeline. 
+ * This service has been set aside for OneId as a customer for the stream processing API.
+ * Example Responses 1** = informational 2** = success 3** =
  * redirect 4** = client error 5** = server error
+ * 
+ * @author kndungu
  */
 @Path("/OneIdRESTService")
 public class GatewayRESTOneIdJsonService {
 	Logger log = Logger.getLogger(GatewayRESTOneIdJsonService.class);
 	
+	/**
+	 * Get function that shows available methods.
+	 * @return Response
+	 */
 	@GET
 	@Path("/about")
 	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
@@ -44,18 +53,17 @@ public class GatewayRESTOneIdJsonService {
 		return Response.status(200).entity(result).build();
 	}
 	
-	@GET
-	@Path("/queue")
-	@Produces({MediaType.TEXT_PLAIN, MediaType.APPLICATION_JSON})
-	public Response verify() {
-		String result = "This is a REST api http service: supports POST for '/queue/json' ";
-		return Response.status(200).entity(result).build();
-	}
-	
 	private String topic = "in.oneid.topic";
 	private String userid = "oneid";
 	
-	
+	/**
+	 * POST function that shows available methods.
+	 * '/queue/json?message={json_message}' -h 'Authentication:<jwt token>'
+	 * 
+	 * @param authentication
+	 * @param message
+	 * @return Response
+	 */
 	@POST
 	@Path("/queue/json")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -64,7 +72,16 @@ public class GatewayRESTOneIdJsonService {
 		
 		return sendToKafka(authentication,message, topic, userid);
 	}
-		
+	
+	
+	/**
+	 * POST function that shows available methods.
+	 * '/queue/json/stream'  -d {json message} -h 'Authentication:<jwt token>'
+	 * 
+	 * @param authentication
+	 * @param jsonStream
+	 * @return Response
+	 */	
 	@POST
 	@Path("/queue/json/stream")
 	@Consumes(MediaType.APPLICATION_JSON)
@@ -99,6 +116,15 @@ public class GatewayRESTOneIdJsonService {
 	}
 
 	
+	/**
+	 * This method sends a message to kafka. It creates a JSON wrapper message with payload, sourceid,authentication and messagetype attributes.
+	 * 
+	 * @param authentication
+	 * @param message
+	 * @param topic
+	 * @param userid
+	 * @return
+	 */
 	private String sendToKafka(String authentication, String message,  String topic, String userid) {
 		
 		String result = "Successufully queued message of length="+message.length()+" on topic="+topic;
@@ -113,7 +139,8 @@ public class GatewayRESTOneIdJsonService {
 		try{
 			
 			String json = mapper.writeValueAsString(data);
-			KafkaProducerClient kafka = KafkaProducerClient.singleton();
+			@SuppressWarnings("unchecked")
+			KafkaProducerClient<String> kafka = (KafkaProducerClient<String>) KafkaProducerClient.singleton();
 			
 			if(topic!=null){
 				result = kafka.send(json,topic);
